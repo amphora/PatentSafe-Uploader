@@ -17,12 +17,13 @@ require 'find'
 
 USERNAME = "simonc"
 HOST = "https://coles.morescience.com"
-
+#DESTINATION = "searchable"
+DESTINATION = "intray"
 
 def upload_file(filename)
   result = HTTPClient.post "#{HOST}/submit/pdf.jspa",
     { :authorId => USERNAME, 
-      :destination => "searchable", 
+      :destination => DESTINATION, 
       :pdfContent => File.new(filename) 
     }
   # This should then come back with something like OK:SJCC0100000059
