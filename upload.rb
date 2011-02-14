@@ -1,4 +1,50 @@
 #!/usr/bin/env ruby
+# == Synopsis 
+#   Upload a directory of PDFs to PatentSafe
+#
+# == Examples
+#   
+#     ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe <directory or filename>
+#
+#   Other examples:
+#     ruby pscheck.rb -q /path/to/repository
+#     ruby pscheck.rb --verbose /path/to/repository
+#     ruby pscheck.rb -y 2007 -v /path/to/repository
+#
+# == Usage 
+#   upload.rb [options] --hostname <patentsafe_server> --username <userid> --destination <destination> path_to_directory_or_file
+#
+#   For help use: ruby upload.rb -h
+#
+# == Options
+#   -h, --help          Displays help message
+#   -u, --username      Username to sutmit as
+#   -h, --hostname      Hostname of the PatentSafe server
+#   -d, --destination   Destination in PatentSafe (sign, intray, searchable)
+#   -v, --version       Display the version, then exit
+#   -q, --quiet         Output as little as possible, overrides verbose
+#   -V, --verbose       Verbose output
+#   
+#
+# == Author
+#   Amphora Research Systems, Ltd.
+#
+# == Copyright
+#   Copyright (c) 2010-2011 Amphora Research Systems Ltd.
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+# 
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+# 
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# TODO - add Metadata as well
 
 # This brings in Gems so we can get httpclient in
 require "rubygems"
@@ -27,6 +73,10 @@ require 'rdoc/usage'
 #DESTINATION = "searchable"
 # DESTINATION = "intray"
 
+# setup the logger if this is the main file
+if __FILE__ == $PROGRAM_NAME
+  LOG = Logger.new(STDOUT)
+end
 
 # Script
 #   sets up arguments, logging level, and options. Also handles help output.
@@ -76,6 +126,8 @@ class Script
   def parsed_options?
     opts = OptionParser.new
     opts.on('-u', '--username')    { @options.username = username }
+    opts.on('-h', '--hostname')    { @options.hostname = hostname }
+    opts.on('-d', '--destination')    { @options.destination = destination }
     opts.on('-v', '--version')  { output_version ; exit 0 }
     opts.on('-h', '--help')     { output_help }
     opts.on('-V', '--verbose')  { @options.verbose = true }
@@ -91,7 +143,7 @@ class Script
 
   # True if required arguments were provided
   def arguments_valid?
-    true if @arguments.length == 2
+    true if @arguments.length == 2 &&  @options.username && @options.hostname && @options.destination
   end
 
   # Setup the arguments
@@ -111,7 +163,7 @@ class Script
   end
 
   def process_command
-    uploader = PatentSafe::Uploader.new()
+    uploader = PatentSafe::Uploader.new(:username => @options.username, :hostname => @options.hostname, :destination => @options.destination)
     uploader.upload(@source)
   end
 
@@ -144,28 +196,22 @@ end # class Script
 
 module PatentSafe
   class Uploader 
-    attr_accessor :username, :host, :destination, :directory
+    attr_accessor :username, :hostname, :destination
 
     def initialize(options={})
 
       LOG.info "-----------------------------------------------------------------------"
-      LOG.info " PatentSafe Stripper "
+      LOG.info " PatentSafe Uploader "
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " Started at: #{Time.now}"
       LOG.info ""
-      
+
     end
 
-
-    USERNAME = "simonc"
-    HOST = "https://jjcr20.morescience.com"
-    #DESTINATION = "searchable"
-    DESTINATION = "intray"
-
     def upload_file(filename)
-      result = HTTPClient.post "#{HOST}/submit/pdf.jspa",
-      { :authorId => USERNAME, 
-        :destination => DESTINATION, 
+      result = HTTPClient.post "#{@hostname}/submit/pdf.jspa",
+      { :authorId => @username, 
+        :destination => @destination, 
         :pdfContent => File.new(filename) 
       }
       # This should then come back with something like OK:SJCC0100000059
@@ -175,23 +221,28 @@ module PatentSafe
     end
 
     # Process an entire directory
-    def upload(directory_name)
-      LOG.info  "Directory called on #{directory_name}"
-      Find.find(directory_name) do |f|
-        # Only work on files which end in .pdf
-        if f.ends_with?(".pdf")
-          result = upload_file(f)
-          LOG.info  "Uploaded #{f}, result = #{result}"
+    def upload(pathname)
+      if File.is_dir?(pathname)
+        LOG.info  "Directory called on #{directory_name}"
+        Find.find(upload) do |f|
+          # Only work on files which end in .pdf
+          if f.ends_with?(".pdf")
+            result = upload_file(f)
+            LOG.info  "Uploaded #{f}, result = #{result}"
+          end
         end
+      elsif pathname.ends_with?(".pdf")
+        result = upload_file(pathname)
+        LOG.info  "Uploaded #{pathname}, result = #{result}"
+      else
+        LOG.info("#{pathname} is not a PDF, ignoring")
       end
+      
+      LOG.info "-----------------------------------------------------------------------"
+      LOG.info " Completed at: #{Time.now}"
+      
     end
 
-    # At the moment take one argument, which is the directory to process
-    opts = OptionParser.new
-    rest = opts.parse(ARGV)
-    directory_name = rest[0]
-    # Start with the first directory
-    process_directory(directory_name)
   end
 end
 
