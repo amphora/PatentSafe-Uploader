@@ -5,14 +5,10 @@
 # == Examples
 #   
 #     ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe <directory or filename>
-#
-#   Other examples:
-#     ruby pscheck.rb -q /path/to/repository
-#     ruby pscheck.rb --verbose /path/to/repository
-#     ruby pscheck.rb -y 2007 -v /path/to/repository
+#     ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe --metadata project=suntan <directory or filename>
 #
 # == Usage 
-#   upload.rb [options] --hostname <patentsafe_server> --username <userid> --destination <destination> path_to_directory_or_file
+#   upload.rb [options] --hostname PATENTSAFE_HOSTNAME --username USERID --destination DESTINATION path_to_directory_or_file
 #
 #   For help use: ruby upload.rb -h
 #
@@ -21,6 +17,7 @@
 #   -u, --username      Username to sutmit as
 #   -h, --hostname      Hostname of the PatentSafe server
 #   -d, --destination   Destination in PatentSafe (sign, intray, searchable)
+#   -m, --metatada      Metadata (in the form TAG=VALUE)
 #   -v, --version       Display the version, then exit
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
@@ -125,25 +122,57 @@ class Script
 
   def parsed_options?
     opts = OptionParser.new
-    opts.on('-u', '--username')    { @options.username = username }
-    opts.on('-h', '--hostname')    { @options.hostname = hostname }
-    opts.on('-d', '--destination')    { @options.destination = destination }
+    @options.metadata = "<metadata>\n"
+    
+    # Mandatory argument - the username to use
+    opts.on("-u", "--username USERNAME",
+            "You must specify a username") do |username|
+      @options.username = username
+    end
+
+    # Mandatory argument - the hostname
+    opts.on("-u", "--hostname HOSTNAME",
+            "You must specify a hostname") do |hostname|
+      @options.hostname = hostname
+    end
+
+    # Mandatory argument - the destination
+    opts.on("-u", "--destination DESTINATION",
+            "You must specify a Destination Submission Queue") do |destination|
+      @options.destination = destination
+    end
+    
+    opts.on("-m", "--metadata TAG=VALUE") do |mditem|
+      puts "Processing Metadata entry, entries so far = [#{@options.metadata}]"
+      # Adding a line for this
+      bits = mditem.split("=")
+      mdentry = "<tag name=\""  + bits[0] + "\">" + bits[1] + "</tag>\n"
+      puts "mdentry=#{mdentry}"
+      @options.metadata << mdentry
+    end
+    
     opts.on('-v', '--version')  { output_version ; exit 0 }
     opts.on('-h', '--help')     { output_help }
     opts.on('-V', '--verbose')  { @options.verbose = true }
-    opts.parse!(@arguments) rescue return false
+    
+    opts.parse!(@arguments) 
+#    opts.parse!(@arguments) rescue return false
     process_options
     true
   end
 
   # Performs post-parse processing on options
   def process_options
+    # Sort out the Verbose/Quiet flags
     @options.verbose = false if @options.quiet
+    
+    # Close the Metadata Packet if needed
+    @options.metadata << "</metadata>"
   end
 
   # True if required arguments were provided
   def arguments_valid?
-    true if @arguments.length == 2 &&  @options.username && @options.hostname && @options.destination
+    true if @arguments.length == 1 &&  @options.username && @options.hostname && @options.destination
   end
 
   # Setup the arguments
@@ -163,7 +192,7 @@ class Script
   end
 
   def process_command
-    uploader = PatentSafe::Uploader.new(:username => @options.username, :hostname => @options.hostname, :destination => @options.destination)
+    uploader = PatentSafe::Uploader.new(:username => @options.username, :hostname => @options.hostname, :destination => @options.destination, :metadata => @options.metadata)
     uploader.upload(@source)
   end
 
@@ -177,6 +206,7 @@ class Script
   end
 
   def output_usage
+    puts "\n\nOptions were: #{@options}"
     RDoc::usage('usage') # gets usage from comments above
   end
 
@@ -196,24 +226,32 @@ end # class Script
 
 module PatentSafe
   class Uploader 
-    attr_accessor :username, :hostname, :destination
+    attr_accessor :username, :hostname, :destination, :metadata
 
     def initialize(options={})
-
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " PatentSafe Uploader "
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " Started at: #{Time.now}"
       LOG.info ""
 
+      @hostname = options[:hostname]
+      @username = options[:username]
+      @destination = options[:destination]
+      @metadata = options[:metadata]
+
     end
 
     def upload_file(filename)
-      result = HTTPClient.post "#{@hostname}/submit/pdf.jspa",
-      { :authorId => @username, 
-        :destination => @destination, 
-        :pdfContent => File.new(filename) 
-      }
+      puts "Upload called filename=#{filename}, username=#{username}, hostname=#{hostname}, destination=#{destination}, metadata=[#{metadata}]"
+      puts "Uploading to #{hostname}/submit/pdf.jspa"
+
+      result = HTTPClient.post "#{hostname}/submit/pdf.jspa",
+                    { :authorId => username, 
+                      :destination => destination, 
+                      :pdfContent => File.new(filename),
+                      :metadata => metadata
+                    }
       # This should then come back with something like OK:SJCC0100000059
       LOG.info  result.content
       # Return true or false
@@ -222,16 +260,16 @@ module PatentSafe
 
     # Process an entire directory
     def upload(pathname)
-      if File.is_dir?(pathname)
+      if File.directory?(pathname)
         LOG.info  "Directory called on #{directory_name}"
         Find.find(upload) do |f|
           # Only work on files which end in .pdf
-          if f.ends_with?(".pdf")
+          if f.to_s.ends_with?(".pdf")
             result = upload_file(f)
             LOG.info  "Uploaded #{f}, result = #{result}"
           end
         end
-      elsif pathname.ends_with?(".pdf")
+      elsif pathname.to_s.ends_with?(".pdf")
         result = upload_file(pathname)
         LOG.info  "Uploaded #{pathname}, result = #{result}"
       else

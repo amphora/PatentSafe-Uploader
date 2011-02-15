@@ -12,3 +12,11 @@ Convert to a Gem??
 ?? What to do with the files
  - Rename them to put the DocID in
  - Move them somewhere else
+
+allow use of non-ssl wit
+	--ssl (default, wins)
+	--no-ssl
+
+list the destination queue names
+
+OptParse http://ruby-doc.org/stdlib/libdoc/optparse/rdoc/classes/OptionParser.html
