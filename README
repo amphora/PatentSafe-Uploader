@@ -1,22 +1,29 @@
 To Do:
+ - Check metadata works (not sure it does)
  - Fix explanations
- - Set metadata
- - Use SSL
+ - Use SSL or not
+	--ssl (default, wins)
+	--no-ssl
  - Example usage
-
-Some mroe stuff in the readme
- - useful for GitHub
+ - Readme
+ - list the destination queue names (not that sign doesn't work)
 
 Convert to a Gem??
 
 ?? What to do with the files
  - Rename them to put the DocID in
- - Move them somewhere else
 
-allow use of non-ssl wit
-	--ssl (default, wins)
-	--no-ssl
 
-list the destination queue names
+Reference this, we don't currently take mime or date https://confluence.amphora-research.com/display/Docs/Direct+submission+via+HTTP
+
+Note in documentation that renames with docid_oldid
+
+Renaming a rename might not work
+
+Check it is quiet and verbose as needed
+
+README and Blog entry
+
 
 OptParse http://ruby-doc.org/stdlib/libdoc/optparse/rdoc/classes/OptionParser.html
+

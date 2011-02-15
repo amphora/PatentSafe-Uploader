@@ -122,6 +122,8 @@ class Script
 
   def parsed_options?
     opts = OptionParser.new
+    
+    # Initialise the metadata packet
     @options.metadata = "<metadata>\n"
     
     # Mandatory argument - the username to use
@@ -143,11 +145,9 @@ class Script
     end
     
     opts.on("-m", "--metadata TAG=VALUE") do |mditem|
-      puts "Processing Metadata entry, entries so far = [#{@options.metadata}]"
-      # Adding a line for this
+      # Adding a line for this metadata item
       bits = mditem.split("=")
       mdentry = "<tag name=\""  + bits[0] + "\">" + bits[1] + "</tag>\n"
-      puts "mdentry=#{mdentry}"
       @options.metadata << mdentry
     end
     
@@ -166,7 +166,7 @@ class Script
     # Sort out the Verbose/Quiet flags
     @options.verbose = false if @options.quiet
     
-    # Close the Metadata Packet if needed
+    # Close the Metadata Packet 
     @options.metadata << "</metadata>"
   end
 
@@ -206,7 +206,6 @@ class Script
   end
 
   def output_usage
-    puts "\n\nOptions were: #{@options}"
     RDoc::usage('usage') # gets usage from comments above
   end
 
@@ -243,19 +242,22 @@ module PatentSafe
     end
 
     def upload_file(filename)
-      puts "Upload called filename=#{filename}, username=#{username}, hostname=#{hostname}, destination=#{destination}, metadata=[#{metadata}]"
-      puts "Uploading to #{hostname}/submit/pdf.jspa"
-
-      result = HTTPClient.post "#{hostname}/submit/pdf.jspa",
+      result = HTTPClient.post "https://#{hostname}/submit/pdf.jspa",
                     { :authorId => username, 
                       :destination => destination, 
                       :pdfContent => File.new(filename),
                       :metadata => metadata
                     }
       # This should then come back with something like OK:SJCC0100000059
-      LOG.info  result.content
+      LOG.info result.content
+      success = result.content[0...2]=="OK"
+      docid = result.content[3..-1]
+      # If we had success, put the DocID on the end of the file
+      if success
+        File.rename(filename, "#{docid}_#{filename.to_s}")
+      end
       # Return true or false
-      result.content[0...2]=="OK"
+      success
     end
 
     # Process an entire directory
@@ -278,7 +280,6 @@ module PatentSafe
       
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " Completed at: #{Time.now}"
-      
     end
 
   end
