@@ -242,7 +242,10 @@ module PatentSafe
     end
 
     def upload_file(filename)
-      result = HTTPClient.post "https://#{hostname}/submit/pdf.jspa",
+      client = HTTPClient.new
+      client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      client.send_timeout=6000
+      result = client.post "https://#{hostname}/submit/pdf.jspa",
                     { :authorId => username, 
                       :destination => destination, 
                       :pdfContent => File.new(filename),

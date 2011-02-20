@@ -1,5 +1,6 @@
 To Do:
  - Check metadata works (not sure it does)
+ - Renaming doesn't work if you supply a full pathname
  - Fix explanations
  - Use SSL or not
 	--ssl (default, wins)
@@ -26,4 +27,7 @@ README and Blog entry
 
 
 OptParse http://ruby-doc.org/stdlib/libdoc/optparse/rdoc/classes/OptionParser.html
+
+
+
 
