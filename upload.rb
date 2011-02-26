@@ -65,6 +65,8 @@ require 'optparse'
 require 'ostruct'
 require 'pathname'
 require 'rdoc/usage'
+require 'open-uri'
+require 'cgi'
 
 
 #DESTINATION = "searchable"
@@ -147,7 +149,7 @@ class Script
     opts.on("-m", "--metadata TAG=VALUE") do |mditem|
       # Adding a line for this metadata item
       bits = mditem.split("=")
-      mdentry = "<tag name=\""  + bits[0] + "\">" + bits[1] + "</tag>\n"
+      mdentry = "<tag name=\""  + CGI.escapeHTML(bits[0]) + "\">" + CGI.escapeHTML(bits[1]) + "</tag>\n"
       @options.metadata << mdentry
     end
     
