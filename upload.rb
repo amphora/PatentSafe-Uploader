@@ -174,6 +174,7 @@ class Script
 
   # True if required arguments were provided
   def arguments_valid?
+    LOG.info("Checking arguments/options  @arguments.length=#{ @arguments.length} @options.username=#{@options.username} @options.hostname=#{@options.hostname} @options.destination=#{@options.destination}")
     true if @arguments.length == 1 &&  @options.username && @options.hostname && @options.destination
   end
 
@@ -259,7 +260,10 @@ module PatentSafe
       docid = result.content[3..-1]
       # If we had success, put the DocID on the end of the file
       if success
-        File.rename(filename, "#{docid}_#{filename.to_s}")
+        old_filename = File.basename(filename)
+        new_filename = "#{docid}_#{old_filename}"
+        path = File.dirname(filename)
+        File.rename(File.join(path, old_filename), File.join(path, new_filename))
       end
       # Return true or false
       success
@@ -268,8 +272,8 @@ module PatentSafe
     # Process an entire directory
     def upload(pathname)
       if File.directory?(pathname)
-        LOG.info  "Directory called on #{directory_name}"
-        Find.find(upload) do |f|
+        LOG.info  "Directory called on #{pathname}"
+        Find.find(pathname) do |f|
           # Only work on files which end in .pdf
           if f.to_s.ends_with?(".pdf")
             result = upload_file(f)
