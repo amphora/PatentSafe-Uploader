@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
-# == Synopsis 
+# == Synopsis
 #   Upload a directory of PDFs to PatentSafe
 #
 # == Examples
-#   
+#
 #     ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe <directory or filename>
 #     ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe --metadata project=suntan <directory or filename>
 #
-# == Usage 
+# == Usage
 #   upload.rb [options] --hostname PATENTSAFE_HOSTNAME --username USERID --destination DESTINATION path_to_directory_or_file
 #
 #   For help use: ruby upload.rb -h
@@ -21,7 +21,7 @@
 #   -v, --version       Display the version, then exit
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
-#   
+#
 #
 # == Author
 #   Amphora Research Systems, Ltd.
@@ -32,12 +32,12 @@
 #   it under the terms of the GNU General Public License as published by
 #   the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
-# 
+#
 #   This program is distributed in the hope that it will be useful,
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
-# 
+#
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -48,7 +48,7 @@ require "rubygems"
 
 # Bring in httpclient - install the gem as follows
 # gem install httpclient
-require 'httpclient' 
+require 'httpclient'
 
 # Ruby extensions - get from "gem install -r extensions"
 # See http://extensions.rubyforge.org/rdoc/index.html
@@ -95,6 +95,7 @@ class Script
     @arguments = arguments
     @stdin = stdin
     @options = OpenStruct.new
+    @options.nossl = false
     @options.verbose = false
     @options.quiet = false
   end
@@ -124,10 +125,10 @@ class Script
 
   def parsed_options?
     opts = OptionParser.new
-    
+
     # Initialise the metadata packet
     @options.metadata = "<metadata>\n"
-    
+
     # Mandatory argument - the username to use
     opts.on("-u", "--username USERNAME",
             "You must specify a username") do |username|
@@ -135,29 +136,30 @@ class Script
     end
 
     # Mandatory argument - the hostname
-    opts.on("-u", "--hostname HOSTNAME",
+    opts.on("-h", "--hostname HOSTNAME",
             "You must specify a hostname") do |hostname|
       @options.hostname = hostname
     end
 
     # Mandatory argument - the destination
-    opts.on("-u", "--destination DESTINATION",
+    opts.on("-d", "--destination DESTINATION",
             "You must specify a Destination Submission Queue") do |destination|
       @options.destination = destination
     end
-    
+
     opts.on("-m", "--metadata TAG=VALUE") do |mditem|
       # Adding a line for this metadata item
       bits = mditem.split("=")
       mdentry = "<tag name=\""  + CGI.escapeHTML(bits[0]) + "\">" + CGI.escapeHTML(bits[1]) + "</tag>\n"
       @options.metadata << mdentry
     end
-    
+
+    opts.on('-n', '--nossl')    { @options.nossl = true }
     opts.on('-v', '--version')  { output_version ; exit 0 }
     opts.on('-h', '--help')     { output_help }
     opts.on('-V', '--verbose')  { @options.verbose = true }
-    
-    opts.parse!(@arguments) 
+
+    opts.parse!(@arguments)
 #    opts.parse!(@arguments) rescue return false
     process_options
     true
@@ -167,8 +169,8 @@ class Script
   def process_options
     # Sort out the Verbose/Quiet flags
     @options.verbose = false if @options.quiet
-    
-    # Close the Metadata Packet 
+
+    # Close the Metadata Packet
     @options.metadata << "</metadata>"
   end
 
@@ -195,7 +197,7 @@ class Script
   end
 
   def process_command
-    uploader = PatentSafe::Uploader.new(:username => @options.username, :hostname => @options.hostname, :destination => @options.destination, :metadata => @options.metadata)
+    uploader = PatentSafe::Uploader.new(:username => @options.username, :hostname => @options.hostname, :destination => @options.destination, :metadata => @options.metadata, :nossl => @options.nossl)
     uploader.upload(@source)
   end
 
@@ -227,7 +229,7 @@ class Script
 end # class Script
 
 module PatentSafe
-  class Uploader 
+  class Uploader
     attr_accessor :username, :hostname, :destination, :metadata
 
     def initialize(options={})
@@ -241,16 +243,19 @@ module PatentSafe
       @username = options[:username]
       @destination = options[:destination]
       @metadata = options[:metadata]
+      @nossl = options[:nossl]
 
     end
 
     def upload_file(filename)
       client = HTTPClient.new
-      client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE unless @nossl
       client.send_timeout=6000
-      result = client.post "https://#{hostname}/submit/pdf.jspa",
-                    { :authorId => username, 
-                      :destination => destination, 
+      proto = @nossl ? "http" : "https"
+      LOG.info "Connecting to: #{proto}://#{hostname}/submit/pdf.jspa"
+      result = client.post "#{proto}://#{hostname}/submit/pdf.jspa",
+                    { :authorId => username,
+                      :destination => destination,
                       :pdfContent => File.new(filename),
                       :metadata => metadata
                     }
@@ -286,7 +291,7 @@ module PatentSafe
       else
         LOG.info("#{pathname} is not a PDF, ignoring")
       end
-      
+
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " Completed at: #{Time.now}"
     end
