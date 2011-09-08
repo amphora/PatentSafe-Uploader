@@ -97,6 +97,7 @@ class Script
     @stdin = stdin
     @options = OpenStruct.new
     @options.metadata = {}
+    @options.skip_duplicates = false
     @options.nossl = false
     @options.verbose = false
     @options.quiet = false
@@ -151,6 +152,7 @@ class Script
       @options.metadata[tag] = value # hash
     end
 
+    opts.on('-s', '--skip-duplicates') { @options.skip_duplicates = true }
     opts.on('-n', '--nossl')    { @options.nossl = true }
     opts.on('-v', '--version')  { output_version ; exit 0 }
     opts.on('-h', '--help')     { output_help }
@@ -180,7 +182,15 @@ class Script
   end
 
   def process_command
-    uploader = PatentSafe::Uploader.new(:username => @options.username, :hostname => @options.hostname, :destination => @options.destination, :metadata => @options.metadata, :nossl => @options.nossl)
+    uploader = PatentSafe::Uploader.new(
+      :username => @options.username,
+      :hostname => @options.hostname,
+      :destination => @options.destination,
+      :metadata => @options.metadata,
+      :skip_duplicates => @options.skip_duplicates,
+      :nossl => @options.nossl)
+
+    # start the uploader
     uploader.upload(@source)
   end
 
@@ -216,75 +226,124 @@ module PatentSafe
     attr_accessor :username, :hostname, :destination, :metadata
 
     def initialize(options={})
+      @hostname = options[:hostname]
+      @username = options[:username]
+      @destination = options[:destination]
+      @metadata = options[:metadata]
+      @skip_duplicates = options[:skip_duplicates]
+      @nossl = options[:nossl]
+    end
+
+    # process an entire directory or a single file
+    def upload(pathname)
+      log_start
+
+      if File.directory?(pathname)
+        LOG.info  "Directory called on #{pathname}"
+        Find.find(pathname) do |f|
+          # Only work on files which end in .pdf
+          upload_file(f) if f.to_s.ends_with?(".pdf")
+        end
+      elsif pathname.to_s.ends_with?(".pdf")
+        upload_file(pathname)
+      else
+        LOG.info("#{pathname} is not a PDF, ignoring")
+      end
+
+      log_completion
+    end
+
+    # perform the actual upload
+    def upload_file(filename)
+      LOG.info " Attempting upload of #{filename}"
+      if @skip_duplicates && found = find_document(filename)
+        LOG.info "  * Not uploaded - #{filename} is a duplicate of #{found}"
+      elsif docid = submit_document(filename)
+        # If we had success, put the DocID on the end of the file
+        rename_file(filename, docid)
+        LOG.info "  * Uploaded - #{filename} as #{docid}"
+      else
+        LOG.info "  * Not uploaded - #{filename} submission was not successful."
+      end
+    end
+
+    private
+
+    def log_start
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " PatentSafe Uploader "
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " Started at: #{Time.now}"
       LOG.info ""
-
-      @hostname = options[:hostname]
-      @username = options[:username]
-      @destination = options[:destination]
-      @metadata = options[:metadata]
-      @nossl = options[:nossl]
     end
 
-    def upload_file(filename)
-      client = HTTPClient.new
-      client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE unless @nossl
-      client.send_timeout=6000
-      proto = @nossl ? "http" : "https"
-      LOG.info "Connecting to: #{proto}://#{hostname}/submit/pdf.jspa"
-      result = client.post "#{proto}://#{hostname}/submit/pdf.jspa",
-                    { :authorId => username,
-                      :destination => destination,
-                      :pdfContent => File.new(filename),
-                      :metadata => metadata_packet(filename)
-                    }
-      # This should then come back with something like OK:SJCC0100000059
-      LOG.info result.content
-      success = result.content[0...2]=="OK"
-      docid = result.content[3..-1]
-      # If we had success, put the DocID on the end of the file
-      if success
-        old_filename = File.basename(filename)
-        new_filename = "#{docid}_#{old_filename}"
-        path = File.dirname(filename)
-        File.rename(File.join(path, old_filename), File.join(path, new_filename))
-      end
-      # Return true or false
-      success
-    end
-
-    # Process an entire directory
-    def upload(pathname)
-      if File.directory?(pathname)
-        LOG.info  "Directory called on #{pathname}"
-        Find.find(pathname) do |f|
-          # Only work on files which end in .pdf
-          if f.to_s.ends_with?(".pdf")
-            result = upload_file(f)
-            LOG.info  "Uploaded #{f}, result = #{result}"
-          end
-        end
-      elsif pathname.to_s.ends_with?(".pdf")
-        result = upload_file(pathname)
-        LOG.info  "Uploaded #{pathname}, result = #{result}"
-      else
-        LOG.info("#{pathname} is not a PDF, ignoring")
-      end
-
+    def log_completion
       LOG.info "-----------------------------------------------------------------------"
       LOG.info " Completed at: #{Time.now}"
     end
 
-    private
+    def http_client
+      client = HTTPClient.new
+      client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE unless @nossl
+      client.send_timeout=6000
+      client
+    end
 
+    def protocol
+      @nossl ? "http" : "https"
+    end
+
+    # detect if PatentSafe already has a document using the configlet
+    # returns first docid if found, false if not
+    def find_document(filename)
+      url = "#{protocol}://#{@hostname}/configlets/find-document-by-hash"
+
+      LOG.info "  * Checking for document with: #{url}"
+
+      result = http_client.get url, { :hash => hash_document(filename) }
+
+      LOG.info "  * Document check result: #{result.content.strip}"
+
+      # Returns O='YES DOCID1 DOCID2 DOCID3' or NO
+      if result.content =~ /^YES/i
+        # return the first document id
+        result.content.strip.split(" ")[1]
+      else
+        false # not found
+      end
+    end
+
+    # submit a document to PatentSafe
+    # returns docid if successful, false if not
+    def submit_document(filename)
+      url = "#{protocol}://#{@hostname}/submit/pdf.jspa"
+
+      LOG.info "  * Submitting document to: #{url}"
+
+      result = http_client.post url,
+        { :authorId => @username,
+          :destination => @destination,
+          :pdfContent => File.new(filename),
+          :metadata => metadata_packet(filename)
+        }
+
+      LOG.info "  * Submission result: #{result.content.strip}"
+
+      # This should then come back with something like OK:SJCC0100000059
+      if result.content =~ /^OK/i
+        result.content.strip[3..-1]
+      else
+        false # unsuccessful
+      end
+    end
+
+    # return a PatentSafe compat metadata packet used for document submission
+    #
     # metadata comes in as a hash of tags and values
     #  {"tag" => "value", "tag1" => value1}
     def metadata_packet(filename)
       # add the hash of the file as metadata
-      @metadata["sha512hash"] = Digest::SHA512.file(filename).hexdigest
+      @metadata["sha512hash"] = hash_document(filename)
 
       packet = "<metadata>\n"
       @metadata.each do |tag, value|
@@ -293,6 +352,19 @@ module PatentSafe
       end
       packet << "</metadata>"
       packet
+    end
+
+    # get the sha512 hash of a file
+    def hash_document(filename)
+      Digest::SHA512.file(filename).hexdigest
+    end
+
+    # add a docid to the front of a file name
+    def rename_file(filename, docid)
+      old_filename = File.basename(filename)
+      new_filename = "#{docid}_#{old_filename}"
+      path = File.dirname(filename)
+      File.rename(File.join(path, old_filename), File.join(path, new_filename))
     end
   end
 end
