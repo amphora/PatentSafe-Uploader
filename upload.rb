@@ -95,6 +95,7 @@ class Script
     @arguments = arguments
     @stdin = stdin
     @options = OpenStruct.new
+    @options.metadata = {}
     @options.nossl = false
     @options.verbose = false
     @options.quiet = false
@@ -126,8 +127,6 @@ class Script
   def parsed_options?
     opts = OptionParser.new
 
-    # Initialise the metadata packet
-    @options.metadata = "<metadata>\n"
 
     # Mandatory argument - the username to use
     opts.on("-u", "--username USERNAME",
@@ -148,10 +147,8 @@ class Script
     end
 
     opts.on("-m", "--metadata TAG=VALUE") do |mditem|
-      # Adding a line for this metadata item
-      bits = mditem.split("=")
-      mdentry = "<tag name=\""  + CGI.escapeHTML(bits[0]) + "\">" + CGI.escapeHTML(bits[1]) + "</tag>\n"
-      @options.metadata << mdentry
+      tag, value = mditem.split("=")
+      @options.metadata[tag] = value # hash
     end
 
     opts.on('-n', '--nossl')    { @options.nossl = true }
@@ -160,7 +157,7 @@ class Script
     opts.on('-V', '--verbose')  { @options.verbose = true }
 
     opts.parse!(@arguments)
-#    opts.parse!(@arguments) rescue return false
+    # opts.parse!(@arguments) rescue return false
     process_options
     true
   end
@@ -169,9 +166,6 @@ class Script
   def process_options
     # Sort out the Verbose/Quiet flags
     @options.verbose = false if @options.quiet
-
-    # Close the Metadata Packet
-    @options.metadata << "</metadata>"
   end
 
   # True if required arguments were provided
@@ -183,17 +177,6 @@ class Script
   # Setup the arguments
   def process_arguments
     @source = Pathname.new(File.expand_path(ARGV[0])) if ARGV[0]
-
-    # # check the target
-    # if @target.exist?
-    #   if !@target.children.empty? && !@options.force
-    #     LOG.error "Target directory '#{@target.to_s}' exists and is not empty. Pass -f (--force) option to proceed anyway."
-    #     exit 0
-    #   end
-    # else
-    #   @target.mkpath
-    # end
-
   end
 
   def process_command
@@ -244,7 +227,6 @@ module PatentSafe
       @destination = options[:destination]
       @metadata = options[:metadata]
       @nossl = options[:nossl]
-
     end
 
     def upload_file(filename)
@@ -257,7 +239,7 @@ module PatentSafe
                     { :authorId => username,
                       :destination => destination,
                       :pdfContent => File.new(filename),
-                      :metadata => metadata
+                      :metadata => metadata_packet
                     }
       # This should then come back with something like OK:SJCC0100000059
       LOG.info result.content
@@ -296,6 +278,19 @@ module PatentSafe
       LOG.info " Completed at: #{Time.now}"
     end
 
+    private
+
+    # metadata comes in as a hash of tags and values
+    #  {"tag" => "value", "tag1" => value1}
+    def metadata_packet
+      packet = "<metadata>\n"
+      @metadata.each do |tag, value|
+        # we can denote a string with something other than a double quote to make it sane
+        packet << %Q|<tag name="#{CGI.escapeHTML(tag)}">#{CGI.escapeHTML(value)}</tag>\n|
+      end
+      packet << "</metadata>"
+      packet
+    end
   end
 end
 
