@@ -58,6 +58,7 @@ require 'extensions/string'
 require 'find'
 
 require 'date'
+require 'digest'
 require 'fileutils'
 require 'find'
 require 'logger'
@@ -126,7 +127,6 @@ class Script
 
   def parsed_options?
     opts = OptionParser.new
-
 
     # Mandatory argument - the username to use
     opts.on("-u", "--username USERNAME",
@@ -239,7 +239,7 @@ module PatentSafe
                     { :authorId => username,
                       :destination => destination,
                       :pdfContent => File.new(filename),
-                      :metadata => metadata_packet
+                      :metadata => metadata_packet(filename)
                     }
       # This should then come back with something like OK:SJCC0100000059
       LOG.info result.content
@@ -282,7 +282,10 @@ module PatentSafe
 
     # metadata comes in as a hash of tags and values
     #  {"tag" => "value", "tag1" => value1}
-    def metadata_packet
+    def metadata_packet(filename)
+      # add the hash of the file as metadata
+      @metadata["sha512hash"] = Digest::SHA512.file(filename).hexdigest
+
       packet = "<metadata>\n"
       @metadata.each do |tag, value|
         # we can denote a string with something other than a double quote to make it sane
