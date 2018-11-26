@@ -50,10 +50,6 @@ require "rubygems"
 # gem install httpclient
 require 'httpclient'
 
-# Ruby extensions - get from "gem install -r extensions"
-# See http://extensions.rubyforge.org/rdoc/index.html
-require 'extensions/string'
-
 # So we can iterate over directory contents
 require 'find'
 
@@ -65,7 +61,6 @@ require 'logger'
 require 'optparse'
 require 'ostruct'
 require 'pathname'
-require 'rdoc/usage'
 require 'open-uri'
 require 'cgi'
 
@@ -200,16 +195,16 @@ class Script
 
   def output_help
     LOG.info version_text
-    RDoc::usage() #exits app
+    # RDoc::usage() #exits app
   end
 
   def output_usage
-    RDoc::usage('usage') # gets usage from comments above
+    # RDoc::usage('usage') # gets usage from comments above
   end
 
   def output_version
     LOG.info version_text
-    RDoc::usage('copyright')
+    # RDoc::usage('copyright')
   end
 
   def output_options
@@ -242,9 +237,9 @@ module PatentSafe
         LOG.info  "Directory called on #{pathname}"
         Find.find(pathname) do |f|
           # Only work on files which end in .pdf
-          upload_file(f) if f.to_s.ends_with?(".pdf")
+          upload_file(f) if f.to_s.end_with?(".pdf")
         end
-      elsif pathname.to_s.ends_with?(".pdf")
+      elsif pathname.to_s.end_with?(".pdf")
         upload_file(pathname)
       else
         LOG.info("#{pathname} is not a PDF, ignoring")
