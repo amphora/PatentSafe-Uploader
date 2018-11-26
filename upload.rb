@@ -167,7 +167,7 @@ class Script
 
   # True if required arguments were provided
   def arguments_valid?
-    LOG.info("Checking arguments/options  @arguments.length=#{ @arguments.length} @options.username=#{@options.username} @options.hostname=#{@options.hostname} @options.destination=#{@options.destination}")
+    # LOG.info("Checking arguments/options  @arguments.length=#{ @arguments.length} @options.username=#{@options.username} @options.hostname=#{@options.hostname} @options.destination=#{@options.destination}")
     true if @arguments.length == 1 &&  @options.username && @options.hostname && @options.destination
   end
 
@@ -237,9 +237,10 @@ module PatentSafe
         LOG.info  "Directory called on #{pathname}"
         Find.find(pathname) do |f|
           # Only work on files which end in .pdf
-          upload_file(f) if f.to_s.end_with?(".pdf")
+          upload_file(f) if f.to_s.end_with?(".pdf") || f.to_s.end_with?(".PDF")
         end
-      elsif pathname.to_s.end_with?(".pdf")
+      elsif pathname.to_s.end_with?(".pdf") || pathname.to_s.end_with?(".PDF")
+        LOG.info("Attempting to upload #{pathname}")
         upload_file(pathname)
       else
         LOG.info("#{pathname} is not a PDF, ignoring")
