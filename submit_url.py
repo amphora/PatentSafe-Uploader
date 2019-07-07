@@ -18,52 +18,154 @@
 import argparse
 
 import urllib.request
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Process the command line arguments
-# ---------------------------------------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser(description='Create a PatentSafe document from the contents of a URL')
-parser.add_argument('ps_hostname', help="The hostname of the destination PatentSafe. Required.")
-parser.add_argument('authorId', help="The PatentSafe user ID (or alias) of the document's author")
-parser.add_argument('url', help="The URL PatentSafe should retrieve and convert to a PDF. Required.")
-parser.add_argument('--princeParamsFile', default="",
-                    help="The name of the file on the server which contains additional parameters for Prince. You can use this for both authentication and processing arguments")
-parser.add_argument('--summary', help="Optional summary for this document")
-#parser.add_argument('--metadata', help="Optional metadata, in the form of a simple XML packet (as above)")
-parser.add_argument('--submissionDate', help="Optional submission date for the document in iso (yyyy-m-dd HH:MM:ss) format")
-parser.add_argument('--queue', help="Optional submission queue for document processing (defaults to sign)")
-#parser.add_argument('--attachment', help="Optional multipart mime attachment(s) to be saved with the submission")
-#parser.add_argument('--validateAuthor', help="Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false)")
-
-args = parser.parse_args()
-print(args)
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Extract the fields just so it's really clear what's being used for laster
-# ---------------------------------------------------------------------------------------------------------------------
-
-submission_url = "https://" + args.ps_hostname + "/sumbit/http_retrieval"
-
-values = {}
-# These are mandatory
-values['url'] = args.url
-values['authorId'] = args.authorId
-# These are optional
-if args.princeParamsFile: values['princeParamsFile'] = args.princeParamsFile
-if args.princeParamsFile: values['summary'] = args.summary
-if args.princeParamsFile: values['queue'] = args.queue
-if args.princeParamsFile: values['submissionDate'] = args.submissionDate
+import uuid
+import io
+import mimetypes
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Build the request and send to PatentSafe
+# Helper class to do Multipart Forms from https://pymotw.com/3/urllib.request/
 # ---------------------------------------------------------------------------------------------------------------------
-data = urllib.parse.urlencode(values)
-data = data.encode('ascii') # data should be bytes
-req = urllib.request.Request(submission_url, data)
-with urllib.request.urlopen(req) as response:
-    the_page = response.read()
-    print(the_page)
+
+class MultiPartForm:
+    """Accumulate the data to be used when posting a form."""
+
+    def __init__(self):
+        self.form_fields = []
+        self.files = []
+        # Use a large random byte string to separate
+        # parts of the MIME data.
+        self.boundary = uuid.uuid4().hex.encode('utf-8')
+        return
+
+    def get_content_type(self):
+        return 'multipart/form-data; boundary={}'.format(
+            self.boundary.decode('utf-8'))
+
+    def add_field(self, name, value):
+        """Add a simple field to the form data."""
+        self.form_fields.append((name, value))
+
+    def add_file(self, fieldname, filename, fileHandle,
+                 mimetype=None):
+        """Add a file to be uploaded."""
+        body = fileHandle.read()
+        if mimetype is None:
+            mimetype = (
+                    mimetypes.guess_type(filename)[0] or
+                    'application/octet-stream'
+            )
+        self.files.append((fieldname, filename, mimetype, body))
+        return
+
+    @staticmethod
+    def _form_data(name):
+        return ('Content-Disposition: form-data; '
+                'name="{}"\r\n').format(name).encode('utf-8')
+
+    @staticmethod
+    def _attached_file(name, filename):
+        return ('Content-Disposition: file; '
+                'name="{}"; filename="{}"\r\n').format(
+            name, filename).encode('utf-8')
+
+    @staticmethod
+    def _content_type(ct):
+        return 'Content-Type: {}\r\n'.format(ct).encode('utf-8')
+
+    def __bytes__(self):
+        """Return a byte-string representing the form data,
+        including attached files.
+        """
+        buffer = io.BytesIO()
+        boundary = b'--' + self.boundary + b'\r\n'
+
+        # Add the form fields
+        for name, value in self.form_fields:
+            buffer.write(boundary)
+            buffer.write(self._form_data(name))
+            buffer.write(b'\r\n')
+            buffer.write(value.encode('utf-8'))
+            buffer.write(b'\r\n')
+
+        # Add the files to upload
+        for f_name, filename, f_content_type, body in self.files:
+            buffer.write(boundary)
+            buffer.write(self._attached_file(f_name, filename))
+            buffer.write(self._content_type(f_content_type))
+            buffer.write(b'\r\n')
+            buffer.write(body)
+            buffer.write(b'\r\n')
+
+        buffer.write(b'--' + self.boundary + b'--\r\n')
+        return buffer.getvalue()
+
+
+if __name__ == '__main__':
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # Process the command line arguments
+    # -----------------------------------------------------------------------------------------------------------------
+    parser = argparse.ArgumentParser(description='Create a PatentSafe document from the contents of a URL')
+    parser.add_argument('ps_hostname', help="The hostname of the destination PatentSafe. Required.")
+    parser.add_argument('authorId', help="The PatentSafe user ID (or alias) of the document's author")
+    parser.add_argument('url', help="The URL PatentSafe should retrieve and convert to a PDF. Required.")
+    parser.add_argument('--princeParamsFile', default="",
+                        help="The name of the file on the server which contains additional parameters for Prince. You can use this for both authentication and processing arguments")
+    parser.add_argument('--summary', help="Optional summary for this document")
+    #parser.add_argument('--metadata', help="Optional metadata, in the form of a simple XML packet (as above)")
+    parser.add_argument('--submissionDate', help="Optional submission date for the document in iso (yyyy-m-dd HH:MM:ss) format")
+    parser.add_argument('--queue', help="Optional submission queue for document processing (defaults to sign)")
+    #parser.add_argument('--attachment', help="Optional multipart mime attachment(s) to be saved with the submission")
+    #parser.add_argument('--validateAuthor', help="Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false)")
+
+    args = parser.parse_args()
+    print(args)
+
+    submission_url = "https://" + args.ps_hostname + "/submit/http-retrieval"
+
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # Create the form
+    # -----------------------------------------------------------------------------------------------------------------
+    form = MultiPartForm()
+    # The required fields
+    form.add_field('url', args.url)
+    form.add_field('authorId', args.authorId)
+
+    # Optional Fields
+    if args.princeParamsFile: form.add_field('princeParamsFile', args.princeParamsFile)
+    if args.summary: form.add_field('summary', args.summary)
+    if args.queue: form.add_field('queue', args.queue)
+    if args.submissionDate: form.add_field('submissionDate', args.submissionDate)
+
+    # # Add a fake file
+    # form.add_file(
+    #     'biography', 'bio.txt',
+    #     fileHandle=io.BytesIO(b'Python developer and blogger.'))
+
+    # Build the request, including the byte-string
+    # for the data to be posted.
+    data = bytes(form)
+    r = urllib.request.Request(submission_url, data=data)
+    r.add_header(
+        'User-agent',
+        'Python Uploader',
+    )
+    r.add_header('Content-type', form.get_content_type())
+    r.add_header('Content-length', len(data))
+
+    # print()
+    # print('OUTGOING DATA:')
+    # for name, value in r.header_items():
+    #     print('{}: {}'.format(name, value))
+    # print()
+    # print(r.data.decode('utf-8'))
+
+
+    with urllib.request.urlopen(r) as response:
+        the_page = response.read()
+        print(the_page)
 
 
 
@@ -89,3 +191,16 @@ with urllib.request.urlopen(req) as response:
 # Metadata as nargs
 # Complete all the arguments
 # Do normal submission too
+
+# What are these
+#
+# final String targetName = Strings.makeEmptyIfNull(request.getParameter("urlTarget")).trim().toLowerCase();
+# if (targetName.isEmpty()) {
+# errors.add("Request is missing any urlTarget name");
+# return;
+# }
+#
+# final String urlQuery =  Strings.makeEmptyIfNull(request.getParameter("urlQuery")).trim().toLowerCase();
+# if (urlQuery.isEmpty()) {
+# log.debug("urlQuery is empty, url-fetch will just use the defined target");
+# }
