@@ -69,15 +69,15 @@ Allows an external application to create users in PatentSafe.
 
 Users will only be created if there isn’t an existing user with that ID. So it is harmless to call this for existing users.
 
-##URL
+## URL
 `/submit/add-user.html`
 
 Note this URL can only be called from localhost. It will not accept requests from anything other than 172.0.0.1.
 
-##Authentication
+## Authentication
 None. This URL can be called without authentication but only from localhost.
 
-##Parameters
+## Parameters
 
 Parameter | Description 
 --------- | ----------- 
