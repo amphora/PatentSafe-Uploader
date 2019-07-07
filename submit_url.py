@@ -17,10 +17,14 @@
 # Parsing arguments
 import argparse
 
+# For building the URL request
 import urllib.request
 import uuid
 import io
 import mimetypes
+
+# For building the Metadata XML
+from xml.sax.saxutils import escape
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -109,20 +113,37 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a PatentSafe document from the contents of a URL')
     parser.add_argument('ps_hostname', help="The hostname of the destination PatentSafe. Required.")
     parser.add_argument('authorId', help="The PatentSafe user ID (or alias) of the document's author")
-    parser.add_argument('url', help="The URL PatentSafe should retrieve and convert to a PDF. Required.")
-    parser.add_argument('--princeParamsFile', default="",
-                        help="The name of the file on the server which contains additional parameters for Prince. You can use this for both authentication and processing arguments")
+    parser.add_argument('target', help="Required. The target to retrieve from, see documentation for the target definitions")
+    parser.add_argument('--urlQuery', help="Optional query parameters to use when accessing the URL defined in the target")
+    # parser.add_argument('--princeParamsFile', default="",
+    #                     help="The name of the file on the server which contains additional parameters for Prince. You can use this for both authentication and processing arguments")
     parser.add_argument('--summary', help="Optional summary for this document")
-    #parser.add_argument('--metadata', help="Optional metadata, in the form of a simple XML packet (as above)")
+    parser.add_argument('--metadata', action='append', help="Optional metadata, in the form tag,value. Can be used multiple times")
     parser.add_argument('--submissionDate', help="Optional submission date for the document in iso (yyyy-m-dd HH:MM:ss) format")
     parser.add_argument('--queue', help="Optional submission queue for document processing (defaults to sign)")
     #parser.add_argument('--attachment', help="Optional multipart mime attachment(s) to be saved with the submission")
-    #parser.add_argument('--validateAuthor', help="Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false)")
+    parser.add_argument('--validateAuthor', action='store_true', help="Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false)")
 
     args = parser.parse_args()
     print(args)
 
     submission_url = "https://" + args.ps_hostname + "/submit/http-retrieval"
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # Create the Metadata XML packet which looks like
+    # <metadata>
+    # <tag name="TAG NAME">VALUE</tag>
+    # </metadata>
+    # -----------------------------------------------------------------------------------------------------------------
+    metadata_field = None
+    if args.metadata:
+        metadata_components = ""
+        for m in args.metadata:
+            tag, value = m.split(',')
+            metadata_components = metadata_components + "<tag name=\"" + escape(tag) + "\">" + escape(value) + "</tag>"
+        metadata_field = "<metadata>" + metadata_components + "</metadata>"
+        print(metadata_field)
+
 
 
     # -----------------------------------------------------------------------------------------------------------------
@@ -130,14 +151,19 @@ if __name__ == '__main__':
     # -----------------------------------------------------------------------------------------------------------------
     form = MultiPartForm()
     # The required fields
-    form.add_field('url', args.url)
+    form.add_field('urlTarget', args.target)
     form.add_field('authorId', args.authorId)
 
+    # If Metadata was built
+    if metadata_field: form.add_field('metadata', metadata_field)
+
     # Optional Fields
-    if args.princeParamsFile: form.add_field('princeParamsFile', args.princeParamsFile)
+    # if args.princeParamsFile: form.add_field('princeParamsFile', args.princeParamsFile)
+    if args.summary: form.add_field('urlQuery', args.urlQuery)
     if args.summary: form.add_field('summary', args.summary)
     if args.queue: form.add_field('queue', args.queue)
     if args.submissionDate: form.add_field('submissionDate', args.submissionDate)
+    if args.validateAuthor: form.add_field('validateAuthor', 'true')
 
     # # Add a fake file
     # form.add_file(
@@ -185,12 +211,11 @@ if __name__ == '__main__':
 
 
 # TODO
-# Submit to PatentSafe
-# Metadata
+# Fix this - b'ERR:Request is missing any urlTarget name\n'
 # Complete command line parsing https://docs.python.org/3.3/library/argparse.html#argparse.ArgumentParser.add_argument
-# Metadata as nargs
 # Complete all the arguments
 # Do normal submission too
+# Document what's in here https://jira.amphora-research.com/browse/PS-4978
 
 # What are these
 #

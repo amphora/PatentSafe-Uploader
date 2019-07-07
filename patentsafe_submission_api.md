@@ -64,6 +64,34 @@ queue (or destination) | Optional submission queue for document processing (defa
 attachment | Optional multipart mime attachment(s) to be saved with the submission.
 validateAuthor | Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false).
 
+## Fetch targets
+PDF Fetch processing has initially been integrated as another generic FileConversion processing for the submission queue. 
+
+Submissions with a mime-type of openeln/url-fetch-request are parsed as an xml file such as: 
+```<fetch-request> 
+    <target>news</target> 
+    <parameters>/weather</parameters> 
+</fetch-request> ```
+
+The target should match a fetch-target (see below), and parameters is expected to be URL safe text to append to the fetch target. 
+
+Fetch Targets are defined in <Repository>/data/config/url-targets/<target-name>.xml 
+
+These files should look like: 
+
+```<url-source> 
+    <target>http://news.bbc.co.uk/&lt;/target> 
+    <prince-option>--page-size=A4</prince-option> 
+    <prince-option>--verbose</prince-option> 
+</url-source> ```
+
+The name of the file, is used to define the target and match the value supplied in the given url-fetch-request. 
+The fetch is built by appending the fetch-request parameters string to the target url. 
+
+In addition each fetch-target may specific any additional command line options to be passed to the prince process used 
+to fetch and convert the url to a PDF.
+
+
 # User Creation
 Allows an external application to create users in PatentSafe.
 
