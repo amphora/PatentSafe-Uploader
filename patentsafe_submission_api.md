@@ -65,25 +65,17 @@ attachment | Optional multipart mime attachment(s) to be saved with the submissi
 validateAuthor | Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false).
 
 ## Fetch targets
-PDF Fetch processing has initially been integrated as another generic FileConversion processing for the submission queue. 
-
-Submissions with a mime-type of openeln/url-fetch-request are parsed as an xml file such as: 
-```<fetch-request> 
-    <target>news</target> 
-    <parameters>/weather</parameters> 
-</fetch-request> ```
-
-The target should match a fetch-target (see below), and parameters is expected to be URL safe text to append to the fetch target. 
-
-Fetch Targets are defined in <Repository>/data/config/url-targets/<target-name>.xml 
+Fetch Targets are defined on the server, in <Repository>/data/config/url-targets/<target-name>.xml 
 
 These files should look like: 
 
-```<url-source> 
-    <target>http://news.bbc.co.uk/&lt;/target> 
+```
+<url-source> 
+    <target>http://news.bbc.co.uk/</target> 
     <prince-option>--page-size=A4</prince-option> 
     <prince-option>--verbose</prince-option> 
-</url-source> ```
+</url-source> 
+```
 
 The name of the file, is used to define the target and match the value supplied in the given url-fetch-request. 
 The fetch is built by appending the fetch-request parameters string to the target url. 
@@ -91,6 +83,14 @@ The fetch is built by appending the fetch-request parameters string to the targe
 In addition each fetch-target may specific any additional command line options to be passed to the prince process used 
 to fetch and convert the url to a PDF.
 
+So if there's a file called bbc.xml then this will get the front page
+`python3 submit_url.py test.morescience.com simonc --metadata a,4 bbc`
+
+## Security Considerations
+Note that having Fetch Target defined on the server's file system is a security measure. Bear in mind that if you
+authenticate to the external system in the Fetch Target, and anyone can cause a page from that web site to end up 
+in PatentSafe owned by any user. Considering naming your Fetch Targets with something unguessable/random as they are 
+essentially a secret. 
 
 # User Creation
 Allows an external application to create users in PatentSafe.
