@@ -74,7 +74,10 @@ These files should look like:
     <target>http://news.bbc.co.uk/</target> 
     <prince-option>--page-size=A4</prince-option> 
     <prince-option>--verbose</prince-option> 
-</url-source> 
+    <ip-restrictions>
+         <allow>10.10.10.10</allow>
+         <allow>172.16.10.60</allow>
+    </ip-restrictions></url-source> 
 ```
 
 The name of the file, is used to define the target and match the value supplied in the given url-fetch-request. 
@@ -85,6 +88,8 @@ to fetch and convert the url to a PDF.
 
 So if there's a file called bbc.xml then this will get the front page
 `python3 submit_url.py test.morescience.com simonc --metadata a,4 bbc`
+
+Note Fetch Targets are reloaded every minute or so, don't expect a change on the server to take effect instantly. 
 
 ## Security Considerations
 Note that having Fetch Target defined on the server's file system is a security measure. Bear in mind that if you
