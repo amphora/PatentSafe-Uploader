@@ -26,6 +26,8 @@ import mimetypes
 # For building the Metadata XML
 from xml.sax.saxutils import escape
 
+# For getting filenames
+import os.path
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Helper class to do Multipart Forms from https://pymotw.com/3/urllib.request/
@@ -115,19 +117,25 @@ if __name__ == '__main__':
     parser.add_argument('authorId', help="The PatentSafe user ID (or alias) of the document's author")
     parser.add_argument('target', help="Required. The target to retrieve from, see documentation for the target definitions")
     parser.add_argument('--urlQuery', help="Optional query parameters to use when accessing the URL defined in the target")
-    # parser.add_argument('--princeParamsFile', default="",
-    #                     help="The name of the file on the server which contains additional parameters for Prince. You can use this for both authentication and processing arguments")
     parser.add_argument('--summary', help="Optional summary for this document")
     parser.add_argument('--metadata', action='append', help="Optional metadata, in the form tag,value. Can be used multiple times")
     parser.add_argument('--submissionDate', help="Optional submission date for the document in iso (yyyy-m-dd HH:MM:ss) format")
     parser.add_argument('--queue', help="Optional submission queue for document processing (defaults to sign)")
-    #parser.add_argument('--attachment', help="Optional multipart mime attachment(s) to be saved with the submission")
+    parser.add_argument('--attachment', action='append', help="Optional files to attach to the submission")
     parser.add_argument('--validateAuthor', action='store_true', help="Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false)")
 
     args = parser.parse_args()
     print(args)
 
     submission_url = "https://" + args.ps_hostname + "/submit/http-retrieval"
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # Create the form
+    # -----------------------------------------------------------------------------------------------------------------
+    form = MultiPartForm()
+    # The required fields
+    form.add_field('urlTarget', args.target)
+    form.add_field('authorId', args.authorId)
 
     # -----------------------------------------------------------------------------------------------------------------
     # Create the Metadata XML packet which looks like
@@ -144,18 +152,17 @@ if __name__ == '__main__':
         metadata_field = "<metadata>" + metadata_components + "</metadata>"
         print(metadata_field)
 
-
-
-    # -----------------------------------------------------------------------------------------------------------------
-    # Create the form
-    # -----------------------------------------------------------------------------------------------------------------
-    form = MultiPartForm()
-    # The required fields
-    form.add_field('urlTarget', args.target)
-    form.add_field('authorId', args.authorId)
-
     # If Metadata was built
     if metadata_field: form.add_field('metadata', metadata_field)
+
+    # Attachments
+    if args.attachment:
+        for filepath in args.attachment:
+            # Get the filename
+            filename = os.path.basename(filepath)
+            with open(filepath, 'rb') as fileHandle:
+                form.add_file("attachment", filename, fileHandle)
+
 
     # Optional Fields
     # if args.princeParamsFile: form.add_field('princeParamsFile', args.princeParamsFile)
@@ -164,11 +171,6 @@ if __name__ == '__main__':
     if args.queue: form.add_field('queue', args.queue)
     if args.submissionDate: form.add_field('submissionDate', args.submissionDate)
     if args.validateAuthor: form.add_field('validateAuthor', 'true')
-
-    # # Add a fake file
-    # form.add_file(
-    #     'biography', 'bio.txt',
-    #     fileHandle=io.BytesIO(b'Python developer and blogger.'))
 
     # Build the request, including the byte-string
     # for the data to be posted.
@@ -190,42 +192,6 @@ if __name__ == '__main__':
 
 
     with urllib.request.urlopen(r) as response:
-        the_page = response.read()
-        print(the_page)
+        response_from_patentsafe = response.read()
+        print(response_from_patentsafe)
 
-
-
-# url | The URL of a web page you wish to become a PDF in PatentSafe
-# princeParamsFile | The name of a file which contains the Parameters to pass to the Prince command line.
-# This is most often used to supply authentication information, but you can also pass information to Prince about
-# how you'd like the document processed.
-# Note that the actual parameters are stored on the server for security reasons,
-# using the HTTP API you can only refer to something that's already in place.
-# authorId | The PatentSafe user ID (or alias) of the document's author.
-# summary | Optional summary for this document
-# metadata | Optional metadata, in the form of a simple XML packet (as above)
-# submissionDate | Optional submission date for the document in iso (yyyy-m-dd HH:MM:ss) format.
-# queue (or destination) | Optional submission queue for document processing (defaults to sign)
-# attachment | Optional multipart mime attachment(s) to be saved with the submission.
-# validateAuthor | Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false).
-
-
-# TODO
-# Fix this - b'ERR:Request is missing any urlTarget name\n'
-# Complete command line parsing https://docs.python.org/3.3/library/argparse.html#argparse.ArgumentParser.add_argument
-# Complete all the arguments
-# Do normal submission too
-# Document what's in here https://jira.amphora-research.com/browse/PS-4978
-
-# What are these
-#
-# final String targetName = Strings.makeEmptyIfNull(request.getParameter("urlTarget")).trim().toLowerCase();
-# if (targetName.isEmpty()) {
-# errors.add("Request is missing any urlTarget name");
-# return;
-# }
-#
-# final String urlQuery =  Strings.makeEmptyIfNull(request.getParameter("urlQuery")).trim().toLowerCase();
-# if (urlQuery.isEmpty()) {
-# log.debug("urlQuery is empty, url-fetch will just use the defined target");
-# }
