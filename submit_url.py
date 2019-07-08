@@ -192,7 +192,7 @@ if __name__ == '__main__':
         for name, value in r.header_items():
             print('{}: {}'.format(name, value))
         print()
-        print(r.data.decode('utf-8'))
+        print(r.data)
         print("----------------------------------------------------------------------")
 
 
