@@ -123,6 +123,7 @@ if __name__ == '__main__':
     parser.add_argument('--queue', help="Optional submission queue for document processing (defaults to sign)")
     parser.add_argument('--attachment', action='append', help="Optional files to attach to the submission")
     parser.add_argument('--validateAuthor', action='store_true', help="Optional argument to validate the authorId exists in PatentSafe. If true the submission is rejected if the authorId is not allowed to submit to PatentSafe (default is false)")
+    parser.add_argument('--verbose', '-v', action='count', help="Output helpful debugging information")
 
     args = parser.parse_args()
     print(args)
@@ -136,6 +137,13 @@ if __name__ == '__main__':
     # The required fields
     form.add_field('urlTarget', args.target)
     form.add_field('authorId', args.authorId)
+
+    # Optional Fields
+    if args.summary: form.add_field('urlQuery', args.urlQuery)
+    if args.summary: form.add_field('summary', args.summary)
+    if args.queue: form.add_field('queue', args.queue)
+    if args.submissionDate: form.add_field('submissionDate', args.submissionDate)
+    if args.validateAuthor: form.add_field('validateAuthor', 'true')
 
     # -----------------------------------------------------------------------------------------------------------------
     # Create the Metadata XML packet which looks like
@@ -155,7 +163,9 @@ if __name__ == '__main__':
     # If Metadata was built
     if metadata_field: form.add_field('metadata', metadata_field)
 
-    # Attachments
+    # -----------------------------------------------------------------------------------------------------------------
+    # Add Attachments
+    # -----------------------------------------------------------------------------------------------------------------
     if args.attachment:
         for filepath in args.attachment:
             # Get the filename
@@ -163,14 +173,6 @@ if __name__ == '__main__':
             with open(filepath, 'rb') as fileHandle:
                 form.add_file("attachment", filename, fileHandle)
 
-
-    # Optional Fields
-    # if args.princeParamsFile: form.add_field('princeParamsFile', args.princeParamsFile)
-    if args.summary: form.add_field('urlQuery', args.urlQuery)
-    if args.summary: form.add_field('summary', args.summary)
-    if args.queue: form.add_field('queue', args.queue)
-    if args.submissionDate: form.add_field('submissionDate', args.submissionDate)
-    if args.validateAuthor: form.add_field('validateAuthor', 'true')
 
     # Build the request, including the byte-string
     # for the data to be posted.
@@ -183,12 +185,15 @@ if __name__ == '__main__':
     r.add_header('Content-type', form.get_content_type())
     r.add_header('Content-length', len(data))
 
-    # print()
-    # print('OUTGOING DATA:')
-    # for name, value in r.header_items():
-    #     print('{}: {}'.format(name, value))
-    # print()
-    # print(r.data.decode('utf-8'))
+    if args.verbose:
+        print("======================================================================")
+        print('OUTGOING DATA:')
+        print("----------------------------------------------------------------------")
+        for name, value in r.header_items():
+            print('{}: {}'.format(name, value))
+        print()
+        print(r.data.decode('utf-8'))
+        print("----------------------------------------------------------------------")
 
 
     with urllib.request.urlopen(r) as response:
