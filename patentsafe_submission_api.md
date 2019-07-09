@@ -99,7 +99,7 @@ Note Fetch Targets are reloaded every minute or so, don't expect a change on the
 
 Often you'll want to use a Cookie to authenticate Prince to internal systems. [Section 8.2 of the Price manual](https://www.princexml.com/doc-prince/#prince-networking)
 mentions a "Cookie Jar" file, which needs to be in the Mozilla/Firefox Cookie format, some information about can be found [here](https://xiix.wordpress.com/2006/03/23/mozillafirefox-cookie-format/)
-which we've also captured locally [here](prince_cookie_jar_documentation)
+which we've also captured locally [here](prince_cookie_jar_documentation.md).
 
 ## Security Considerations
 Note that having Fetch Target defined on the server's file system is a security measure. Bear in mind that if you
