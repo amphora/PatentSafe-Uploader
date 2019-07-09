@@ -5,8 +5,10 @@ This applies to permanent cookies only, as session cookies (cleared when you qui
 file. One complete cookie per line, and each piece is separated by a tab character (‘\t’ in Python), not a standard 
 space character as shown here:
 
+```
 .example.com TRUE / FALSE 1143149359 login_id 123456
 www.yermom.com FALSE / FALSE 1143149359 my_nuts on
+```
 
 Column | Use | Description
 --- | --- | ---
