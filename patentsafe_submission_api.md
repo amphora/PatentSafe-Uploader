@@ -30,9 +30,11 @@ validateAuthor | Optional argument to validate the authorId exists in PatentSafe
 
 ## Metadata
 Metadata values may be passed in the metadata attribute of the POST request. This should be a simple XML packet as follows:
+```
 <metadata>
-<tag name="TAG NAME">VALUE</tag>
+    <tag name="TAG NAME">VALUE</tag>
 </metadata>
+```
 
 ## Returns
 PatentSafe will return a string which is OK: docId where docId is the document ID that's been allocated by PatentSafe. If there's an error, PatentSafe will return ERR: message where message is some kind of useful error message.
@@ -45,7 +47,7 @@ Amphora have licensed the Prince library (https://www.princexml.com) will can co
 Using this method you can request that PatentSafe call your application, get the HTML page and other associated graphics and assets, and render a PDF which is then submitted to PatentSafe as above.
 
 ## URL
-`/sumbit/http_retrieval`
+`/submit/http_retrieval`
 
 ## Authentication
 None. This URL can be called without authentication.
@@ -77,7 +79,8 @@ These files should look like:
     <ip-restrictions>
          <allow>10.10.10.10</allow>
          <allow>172.16.10.60</allow>
-    </ip-restrictions></url-source> 
+    </ip-restrictions>
+</url-source> 
 ```
 
 The name of the file, is used to define the target and match the value supplied in the given url-fetch-request. 
@@ -87,9 +90,16 @@ In addition each fetch-target may specific any additional command line options t
 to fetch and convert the url to a PDF.
 
 So if there's a file called bbc.xml then this will get the front page
+
 `python3 submit_url.py test.morescience.com simonc --metadata a,4 bbc`
 
 Note Fetch Targets are reloaded every minute or so, don't expect a change on the server to take effect instantly. 
+
+## Prince and Cookie Files
+
+Often you'll want to use a Cookie to authenticate Prince to internal systems. [Section 8.2 of the Price manual](https://www.princexml.com/doc-prince/#prince-networking)
+mentions a "Cookie Jar" file, which needs to be in the Mozilla/Firefox Cookie format, some information about can be found [here](https://xiix.wordpress.com/2006/03/23/mozillafirefox-cookie-format/)
+which we've also captured locally [here](prince_cookie_jar_documentation)
 
 ## Security Considerations
 Note that having Fetch Target defined on the server's file system is a security measure. Bear in mind that if you
@@ -101,6 +111,17 @@ essentially a secret.
 Allows an external application to create users in PatentSafe.
 
 Users will only be created if there isn’t an existing user with that ID. So it is harmless to call this for existing users.
+
+# Example
+```
+curl --form pdfContent=@$1 \
+ --form “urlTarget=reactions” \
+ --form “authorId=myuserid” \
+ --form “destination=intray”  \
+ --form attachment=@/Users/people/test-document.pdf \
+ https://cust.morescience.com/submit/fetch-request
+ 
+```
 
 ## URL
 `/submit/add-user.html`
