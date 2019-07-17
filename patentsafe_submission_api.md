@@ -101,6 +101,12 @@ Often you'll want to use a Cookie to authenticate Prince to internal systems. [S
 mentions a "Cookie Jar" file, which needs to be in the Mozilla/Firefox Cookie format, some information about can be found [here](https://xiix.wordpress.com/2006/03/23/mozillafirefox-cookie-format/)
 which we've also captured locally [here](prince_cookie_jar_documentation.md).
 
+Note that Prince uses Curl underneath so you can test your Cookie and other access with 
+
+```
+    curl --cookie-jar FILE URL
+```
+
 ## Security Considerations
 Note that having Fetch Target defined on the server's file system is a security measure. Bear in mind that if you
 authenticate to the external system in the Fetch Target, and anyone can cause a page from that web site to end up 
