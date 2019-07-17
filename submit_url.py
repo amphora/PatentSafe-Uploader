@@ -139,7 +139,7 @@ if __name__ == '__main__':
     form.add_field('authorId', args.authorId)
 
     # Optional Fields
-    if args.summary: form.add_field('urlQuery', args.urlQuery)
+    if args.urlQuery: form.add_field('urlQuery', args.urlQuery)
     if args.summary: form.add_field('summary', args.summary)
     if args.queue: form.add_field('queue', args.queue)
     if args.submissionDate: form.add_field('submissionDate', args.submissionDate)
