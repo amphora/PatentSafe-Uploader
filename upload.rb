@@ -15,9 +15,10 @@
 # == Options
 #   -h, --help          Displays help message
 #   -u, --username      Username to sutmit as
-#   -h, --hostname      Hostname of the PatentSafe server
+#   -n, --hostname      Hostname of the PatentSafe server
 #   -d, --destination   Destination in PatentSafe (sign, intray, searchable)
 #   -m, --metatada      Metadata (in the form TAG=VALUE)
+#   -s, --submitdate    Optionally, override the PatentSafe Submission Date (in yyyy-mm-dd HH:MM:ss format)
 #   -v, --version       Display the version, then exit
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
@@ -65,7 +66,6 @@ require 'pathname'
 require 'open-uri'
 require 'cgi'
 
-
 #DESTINATION = "searchable"
 # DESTINATION = "intray"
 
@@ -77,7 +77,7 @@ end
 # Script
 #   sets up arguments, logging level, and options. Also handles help output.
 class Script
-  VERSION = '0.1'
+  VERSION = '0.5'
 
   # Simple log formatter
   class Formatter < Logger::Formatter
@@ -93,6 +93,7 @@ class Script
     @stdin = stdin
     @options = OpenStruct.new
     @options.metadata = {}
+    @options.submitdate = ""
     @options.skip_duplicates = false
     @options.nossl = false
     @options.verbose = false
@@ -148,6 +149,10 @@ class Script
       @options.metadata[tag] = value # hash
     end
 
+    opts.on("-s", "--submitdate SUBMITDATE") do |submitdate|
+      @options.submitdate = submitdate
+    end
+
     opts.on('-s', '--skip-duplicates') { @options.skip_duplicates = true }
     opts.on('-n', '--nossl')    { @options.nossl = true }
     opts.on('-v', '--version')  { output_version ; exit 0 }
@@ -183,6 +188,7 @@ class Script
       :hostname => @options.hostname,
       :destination => @options.destination,
       :metadata => @options.metadata,
+      :submitdate => @options.submitdate,
       :skip_duplicates => @options.skip_duplicates,
       :nossl => @options.nossl)
 
@@ -219,13 +225,14 @@ end # class Script
 
 module PatentSafe
   class Uploader
-    attr_accessor :username, :hostname, :destination, :metadata
+    attr_accessor :username, :hostname, :destination, :metadata, :submitdate
 
     def initialize(options={})
       @hostname = options[:hostname]
       @username = options[:username]
       @destination = options[:destination]
       @metadata = options[:metadata]
+      @submitdate = options[:submitdate]
       @skip_duplicates = options[:skip_duplicates]
       @nossl = options[:nossl]
     end
@@ -321,7 +328,8 @@ module PatentSafe
         { :authorId => @username,
           :destination => @destination,
           :pdfContent => File.new(filename),
-          :metadata => metadata_packet(filename)
+          :metadata => metadata_packet(filename),
+          :submitdate => @submitdate
         }
 
       LOG.info "  * Submission result: #{result.content.strip}"
