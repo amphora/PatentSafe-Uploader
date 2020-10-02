@@ -28,7 +28,7 @@
 #   Amphora Research Systems, Ltd.
 #
 # == Copyright
-# Copyright  2019 Amphora Research Systems Ltd.
+# Copyright  2010-2020 Amphora Research Systems Ltd.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -43,6 +43,8 @@
 # OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+# Note this requires the httpclient gem and the rdoc gem
+
 # TODO - add Metadata as well
 
 # This brings in Gems so we can get httpclient in
@@ -51,6 +53,10 @@ require "rubygems"
 # Bring in httpclient - install the gem as follows
 # gem install httpclient
 require 'httpclient'
+
+# So it can print usage information - requires the rdoc gem, install as follows
+# gem install rdoc
+require 'rdoc'
 
 # So we can iterate over directory contents
 require 'find'
@@ -202,16 +208,39 @@ class Script
 
   def output_help
     LOG.info version_text
-    # RDoc::usage() #exits app
+    output_usage
   end
 
   def output_usage
-    # RDoc::usage('usage') # gets usage from comments above
+    LOG.info "Synopsis
+  Upload a directory of PDFs to PatentSafe
+
+Examples
+    ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe <directory or filename>
+    ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe --metadata project=suntan <directory or filename>
+
+Usage
+  upload.rb [options] --hostname PATENTSAFE_HOSTNAME --username USERID --destination DESTINATION path_to_directory_or_file
+
+  For help use: ruby upload.rb -h
+
+Options
+  -h, --help          Displays help message
+  -u, --username      Username to sutmit as
+  -n, --hostname      Hostname of the PatentSafe server
+  -d, --destination   Destination in PatentSafe (sign, intray, searchable)
+  -m, --metatada      Metadata (in the form TAG=VALUE)
+  -s, --submitdate    Optionally, override the PatentSafe Submission Date (in yyyy-mm-dd HH:MM:ss format)
+  -v, --version       Display the version, then exit
+  -q, --quiet         Output as little as possible, overrides verbose
+  -V, --verbose       Verbose output
+
+See https://github.com/amphora/PatentSafe-Uploader/ for more information "
   end
 
   def output_version
     LOG.info version_text
-    # RDoc::usage('copyright')
+    LOG.info "Copyright 2010-2020 Amphora Research Systems Ltd."
   end
 
   def output_options
