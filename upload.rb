@@ -358,7 +358,7 @@ module PatentSafe
           :destination => @destination,
           :pdfContent => File.new(filename),
           :metadata => metadata_packet(filename),
-          :submitdate => @submitdate
+          :submissionDate => @submitdate
         }
 
       LOG.info "  * Submission result: #{result.content.strip}"
