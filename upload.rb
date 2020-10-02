@@ -15,9 +15,10 @@
 # == Options
 #   -h, --help          Displays help message
 #   -u, --username      Username to sutmit as
-#   -h, --hostname      Hostname of the PatentSafe server
+#   -n, --hostname      Hostname of the PatentSafe server
 #   -d, --destination   Destination in PatentSafe (sign, intray, searchable)
 #   -m, --metatada      Metadata (in the form TAG=VALUE)
+#   -s, --submitdate    Optionally, override the PatentSafe Submission Date (in yyyy-mm-dd HH:MM:ss format)
 #   -v, --version       Display the version, then exit
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Verbose output
@@ -27,7 +28,7 @@
 #   Amphora Research Systems, Ltd.
 #
 # == Copyright
-# Copyright  2019 Amphora Research Systems Ltd.
+# Copyright  2010-2020 Amphora Research Systems Ltd.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -42,6 +43,8 @@
 # OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+# Note this requires the httpclient gem and the rdoc gem
+
 # TODO - add Metadata as well
 
 # This brings in Gems so we can get httpclient in
@@ -50,6 +53,10 @@ require "rubygems"
 # Bring in httpclient - install the gem as follows
 # gem install httpclient
 require 'httpclient'
+
+# So it can print usage information - requires the rdoc gem, install as follows
+# gem install rdoc
+require 'rdoc'
 
 # So we can iterate over directory contents
 require 'find'
@@ -65,7 +72,6 @@ require 'pathname'
 require 'open-uri'
 require 'cgi'
 
-
 #DESTINATION = "searchable"
 # DESTINATION = "intray"
 
@@ -77,7 +83,7 @@ end
 # Script
 #   sets up arguments, logging level, and options. Also handles help output.
 class Script
-  VERSION = '0.1'
+  VERSION = '0.5'
 
   # Simple log formatter
   class Formatter < Logger::Formatter
@@ -93,6 +99,7 @@ class Script
     @stdin = stdin
     @options = OpenStruct.new
     @options.metadata = {}
+    @options.submitdate = ""
     @options.skip_duplicates = false
     @options.nossl = false
     @options.verbose = false
@@ -148,6 +155,10 @@ class Script
       @options.metadata[tag] = value # hash
     end
 
+    opts.on("-s", "--submitdate SUBMITDATE") do |submitdate|
+      @options.submitdate = submitdate
+    end
+
     opts.on('-s', '--skip-duplicates') { @options.skip_duplicates = true }
     opts.on('-n', '--nossl')    { @options.nossl = true }
     opts.on('-v', '--version')  { output_version ; exit 0 }
@@ -183,6 +194,7 @@ class Script
       :hostname => @options.hostname,
       :destination => @options.destination,
       :metadata => @options.metadata,
+      :submitdate => @options.submitdate,
       :skip_duplicates => @options.skip_duplicates,
       :nossl => @options.nossl)
 
@@ -196,16 +208,39 @@ class Script
 
   def output_help
     LOG.info version_text
-    # RDoc::usage() #exits app
+    output_usage
   end
 
   def output_usage
-    # RDoc::usage('usage') # gets usage from comments above
+    LOG.info "Synopsis
+  Upload a directory of PDFs to PatentSafe
+
+Examples
+    ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe <directory or filename>
+    ruby upload.rb --hostname demo.morescience.com --username simonc --destination patentsafe --metadata project=suntan <directory or filename>
+
+Usage
+  upload.rb [options] --hostname PATENTSAFE_HOSTNAME --username USERID --destination DESTINATION path_to_directory_or_file
+
+  For help use: ruby upload.rb -h
+
+Options
+  -h, --help          Displays help message
+  -u, --username      Username to sutmit as
+  -n, --hostname      Hostname of the PatentSafe server
+  -d, --destination   Destination in PatentSafe (sign, intray, searchable)
+  -m, --metatada      Metadata (in the form TAG=VALUE)
+  -s, --submitdate    Optionally, override the PatentSafe Submission Date (in yyyy-mm-dd HH:MM:ss format)
+  -v, --version       Display the version, then exit
+  -q, --quiet         Output as little as possible, overrides verbose
+  -V, --verbose       Verbose output
+
+See https://github.com/amphora/PatentSafe-Uploader/ for more information "
   end
 
   def output_version
     LOG.info version_text
-    # RDoc::usage('copyright')
+    LOG.info "Copyright 2010-2020 Amphora Research Systems Ltd."
   end
 
   def output_options
@@ -219,13 +254,14 @@ end # class Script
 
 module PatentSafe
   class Uploader
-    attr_accessor :username, :hostname, :destination, :metadata
+    attr_accessor :username, :hostname, :destination, :metadata, :submitdate
 
     def initialize(options={})
       @hostname = options[:hostname]
       @username = options[:username]
       @destination = options[:destination]
       @metadata = options[:metadata]
+      @submitdate = options[:submitdate]
       @skip_duplicates = options[:skip_duplicates]
       @nossl = options[:nossl]
     end
@@ -321,7 +357,8 @@ module PatentSafe
         { :authorId => @username,
           :destination => @destination,
           :pdfContent => File.new(filename),
-          :metadata => metadata_packet(filename)
+          :metadata => metadata_packet(filename),
+          :submissionDate => @submitdate
         }
 
       LOG.info "  * Submission result: #{result.content.strip}"
